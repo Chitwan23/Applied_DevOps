@@ -20,7 +20,7 @@
 </head>
 <body>
     <h1>Comment Index Page</h1>
-    <form action="process_comments.php" method="post">
+    <form action="{{ url_for('process_comments') }}" method="post">
         <label for="commentNumber">Enter number of Comments:</label>
         <input type="number" id="commentNumber" name="commentNumber" min="0" oninput="validateCommentsInput()" required>
         <span id="commentsErrorMessage" style="color: red;"></span>

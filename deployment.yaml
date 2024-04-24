@@ -1,0 +1,20 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentiment-analysis-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sentiment-analysis-app
+  template:
+    metadata:
+      labels:
+        app: sentiment-analysis-app
+    spec:
+      containers:
+        - name: sentiment-analysis-app
+          image: anushkachamoli/sentiment-analysis-app:v1
+          ports:
+            - containerPort: 5000
