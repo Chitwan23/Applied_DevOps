@@ -2,12 +2,8 @@ from flask import Flask, render_template, request, redirect, url_for
 import requests
 from textblob import TextBlob
 import statistics
-import random
 
 app = Flask(__name__)
-
-# Empty list to store comments
-filtered_comments = []
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -15,8 +11,6 @@ def index():
 
 @app.route('/process_comments', methods=['POST'])
 def process_comments():
-    global filtered_comments
-
     commentNumber = int(request.form['commentNumber'])
     videoId = request.form['videoId']
 
@@ -24,88 +18,67 @@ def process_comments():
     response = requests.get(url)
     data = response.json()
 
-    # Get all the comments from the API response
-    for item in data['items']:
-        filtered_comments.append(item['snippet']['topLevelComment']['snippet']['textDisplay'])
-
-    # Process and analyze the comments using TextBlob
-    analysis_results = analysis(filtered_comments)
-
-    # Redirect to the result page with the analysis_results parameter
-    return redirect(url_for('result', analysis_results=analysis_results))
+    if 'items' in data:
+        filtered_comments = [item['snippet']['topLevelComment']['snippet']['textDisplay'] for item in data['items']]
+        analysis_results = analysis(filtered_comments)
+        return redirect(url_for('result', analysis_results=analysis_results))
+    else:
+        error_message = "Error: No comments found for the provided video ID."
+        return redirect(url_for('result', analysis_results=error_message))
 
 @app.route('/result')
 def result():
-    # Get the analysis results from the URL parameter
     analysis_results = request.args.get('analysis_results')
 
     if analysis_results is None:
-        # Handle the case where analysis_results is not defined
         return "Error: Analysis results not available."
 
-    # Return the sentiment analysis results here
     return render_template('result.html', analysis_results=analysis_results)
 
 def analysis(filtered_comments):
-    # Your TextBlob analysis code here
-    positive = 0
-    wpositive = 0
-    spositive = 0
-    negative = 0
-    wnegative = 0
-    snegative = 0
-    neutral = 0
-    track = []
+    polarities = [TextBlob(comment).sentiment.polarity for comment in filtered_comments]
 
-    for comment in filtered_comments:
-        analysis = TextBlob(comment)
-        i = analysis.sentiment.polarity
-        if (i == 0):
-            neutral += 1
-        elif (i > 0 and i <= 0.3):
-            wpositive += 1
-        elif (i > 0.3 and i <= 0.6):
-            positive += 1
-        elif (i > 0.6 and i <= 1):
-            spositive += 1
-        elif (i > -0.3 and i <= 0):
-            wnegative += 1
-        elif (i > -0.6 and i <= -0.3):
-            negative += 1
-        elif (i > -1 and i <= -0.6):
-            snegative += 1
-        track.append(i)
+    positive = sum(polarity > 0 for polarity in polarities)
+    wpositive = sum(0 < polarity <= 0.3 for polarity in polarities)
+    spositive = sum(0.3 < polarity <= 0.6 for polarity in polarities)
+    negative = sum(polarity < 0 for polarity in polarities)
+    wnegative = sum(-0.3 < polarity <= 0 for polarity in polarities)
+    snegative = sum(-0.6 < polarity <= -0.3 for polarity in polarities)
+    neutral = sum(polarity == 0 for polarity in polarities)
 
-    NoOfTerms = len(filtered_comments)
+    total_comments = len(filtered_comments)
 
-    positive_percentage = format(100 * float(positive) / float(NoOfTerms), '0.2f')
-    wpositive_percentage = format(100 * float(wpositive) / float(NoOfTerms), '0.2f')
-    spositive_percentage = format(100 * float(spositive) / float(NoOfTerms), '0.2f')
-    negative_percentage = format(100 * float(negative) / float(NoOfTerms), '0.2f')
-    wnegative_percentage = format(100 * float(wnegative) / float(NoOfTerms), '0.2f')
-    snegative_percentage = format(100 * float(snegative) / float(NoOfTerms), '0.2f')
-    neutral_percentage = format(100 * float(neutral) / float(NoOfTerms), '0.2f')
+    positive_percentage = format(100 * positive / total_comments, '.2f')
+    wpositive_percentage = format(100 * wpositive / total_comments, '.2f')
+    spositive_percentage = format(100 * spositive / total_comments, '.2f')
+    negative_percentage = format(100 * negative / total_comments, '.2f')
+    wnegative_percentage = format(100 * wnegative / total_comments, '.2f')
+    snegative_percentage = format(100 * snegative / total_comments, '.2f')
+    neutral_percentage = format(100 * neutral / total_comments, '.2f')
 
-    Final_score = statistics.mean(track)
-
-    if Final_score > 0:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Positive with Score {format(100 * Final_score, '0.2f')}%"
-    elif Final_score < 0:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Negative with Score {format(100 * Final_score, '0.2f')}%"
+    sentiment_scores = [polarity for polarity in polarities if polarity != 0]
+    if sentiment_scores:
+        overall_score = statistics.mean(sentiment_scores)
+        if overall_score > 0:
+            sentiment_result = f"Overall sentiment: Positive with Score {format(100 * overall_score, '.2f')}%"
+        elif overall_score < 0:
+            sentiment_result = f"Overall sentiment: Negative with Score {format(100 * overall_score, '.2f')}%"
+        else:
+            sentiment_result = f"Overall sentiment: Neutral with Score 0.00%"
     else:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Moderate with Score {format(100 * Final_score, '0.2f')}%"
+        sentiment_result = "No sentiment detected."
 
     detailed_report = (
-        f"Detailed Report: {positive_percentage}% people thought it was positive, "
-        f"{wpositive_percentage}% people thought it was weakly positive, "
-        f"{spositive_percentage}% people thought it was strongly positive, "
-        f"{negative_percentage}% people thought it was negative, "
-        f"{wnegative_percentage}% people thought it was weakly negative, "
-        f"{snegative_percentage}% people thought it was strongly negative, "
-        f"{neutral_percentage}% people thought it was neutral"
+        f"Positive: {positive_percentage}%, "
+        f"Weakly Positive: {wpositive_percentage}%, "
+        f"Strongly Positive: {spositive_percentage}%, "
+        f"Negative: {negative_percentage}%, "
+        f"Weakly Negative: {wnegative_percentage}%, "
+        f"Strongly Negative: {snegative_percentage}%, "
+        f"Neutral: {neutral_percentage}%"
     )
 
-    # Add line breaks for better readability
     return f"{sentiment_result}\n\n{detailed_report}"
+
 if __name__ == '__main__':
     app.run(debug=True)

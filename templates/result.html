@@ -6,31 +6,47 @@
     <title>Sentiment Analysis Results</title>
     <style>
         body {
+            align-items: center;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            height: 100vh;
             font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
             margin: 0;
             padding: 0;
         }
 
-        h1 {
-            color: #333;
+        .container {
             text-align: center;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #dc2f55;
+            font-size: 50px;
+            font-weight: 600;
+            margin-top: 30px;
         }
 
         p {
             max-width: 600px;
             margin: 20px auto;
             padding: 20px;
-            background-color: #fff;
+            background-color: #15172b;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             border-radius: 5px;
-            color: #333;
+            color: #eee;
+            font-family: sans-serif;
+            font-size: 30px;
+            font-weight: 600;
             white-space: pre-line; /* This will preserve line breaks */
         }
     </style>
 </head>
 <body>
-    <h1>Sentiment Analysis Results</h1>
-    <p>{{ analysis_results }}</p>
+    <div class="container">
+        <h1>Sentiment Analysis Results</h1>
+        <p>{{ analysis_results }}</p>
+    </div>
 </body>
 </html>
