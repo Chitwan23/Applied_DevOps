@@ -2,9 +2,10 @@ from flask import Flask, render_template, request, redirect, url_for
 import requests
 from textblob import TextBlob
 import statistics
-import random
+from prometheus_flask_exporter import PrometheusMetrics
 
 app = Flask(__name__)
+metrics = PrometheusMetrics(app)  # Create PrometheusMetrics instance
 
 # Empty list to store comments
 filtered_comments = []
@@ -46,66 +47,52 @@ def result():
     # Return the sentiment analysis results here
     return render_template('result.html', analysis_results=analysis_results)
 
+@metrics.do_not_track()
 def analysis(filtered_comments):
-    # Your TextBlob analysis code here
-    positive = 0
-    wpositive = 0
-    spositive = 0
-    negative = 0
-    wnegative = 0
-    snegative = 0
-    neutral = 0
-    track = []
+    if not filtered_comments:
+        return {"error": "No comments to analyze"}
 
+    # Initialize sentiment counters
+    sentiment_counts = {
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0
+    }
+
+    # Perform sentiment analysis for each comment
+    sentiments = []
     for comment in filtered_comments:
         analysis = TextBlob(comment)
-        i = analysis.sentiment.polarity
-        if (i == 0):
-            neutral += 1
-        elif (i > 0 and i <= 0.3):
-            wpositive += 1
-        elif (i > 0.3 and i <= 0.6):
-            positive += 1
-        elif (i > 0.6 and i <= 1):
-            spositive += 1
-        elif (i > -0.3 and i <= 0):
-            wnegative += 1
-        elif (i > -0.6 and i <= -0.3):
-            negative += 1
-        elif (i > -1 and i <= -0.6):
-            snegative += 1
-        track.append(i)
+        polarity = analysis.sentiment.polarity
 
-    NoOfTerms = len(filtered_comments)
+        if polarity > 0:
+            sentiment_counts["positive"] += 1
+        elif polarity < 0:
+            sentiment_counts["negative"] += 1
+        else:
+            sentiment_counts["neutral"] += 1
 
-    positive_percentage = format(100 * float(positive) / float(NoOfTerms), '0.2f')
-    wpositive_percentage = format(100 * float(wpositive) / float(NoOfTerms), '0.2f')
-    spositive_percentage = format(100 * float(spositive) / float(NoOfTerms), '0.2f')
-    negative_percentage = format(100 * float(negative) / float(NoOfTerms), '0.2f')
-    wnegative_percentage = format(100 * float(wnegative) / float(NoOfTerms), '0.2f')
-    snegative_percentage = format(100 * float(snegative) / float(NoOfTerms), '0.2f')
-    neutral_percentage = format(100 * float(neutral) / float(NoOfTerms), '0.2f')
+        sentiments.append(polarity)
 
-    Final_score = statistics.mean(track)
+    # Calculate percentages
+    total_comments = len(filtered_comments)
+    positive_percentage = (sentiment_counts["positive"] / total_comments) * 100
+    negative_percentage = (sentiment_counts["negative"] / total_comments) * 100
+    neutral_percentage = (sentiment_counts["neutral"] / total_comments) * 100
 
-    if Final_score > 0:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Positive with Score {format(100 * Final_score, '0.2f')}%"
-    elif Final_score < 0:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Negative with Score {format(100 * Final_score, '0.2f')}%"
-    else:
-        sentiment_result = f"Using TextBlob Sentiment Analyzer: Overall Reviews are Moderate with Score {format(100 * Final_score, '0.2f')}%"
+    # Calculate overall sentiment score
+    overall_sentiment_score = statistics.mean(sentiments)
 
-    detailed_report = (
-        f"Detailed Report: {positive_percentage}% people thought it was positive, "
-        f"{wpositive_percentage}% people thought it was weakly positive, "
-        f"{spositive_percentage}% people thought it was strongly positive, "
-        f"{negative_percentage}% people thought it was negative, "
-        f"{wnegative_percentage}% people thought it was weakly negative, "
-        f"{snegative_percentage}% people thought it was strongly negative, "
-        f"{neutral_percentage}% people thought it was neutral"
-    )
+    # Generate result dictionary
+    analysis_results = {
+        "sentiment_counts": sentiment_counts,
+        "positive_percentage": positive_percentage,
+        "negative_percentage": negative_percentage,
+        "neutral_percentage": neutral_percentage,
+        "overall_sentiment_score": overall_sentiment_score
+    }
 
-    # Add line breaks for better readability
-    return f"{sentiment_result}\n\n{detailed_report}"
+    return analysis_results
+
 if __name__ == '__main__':
     app.run(debug=True)
